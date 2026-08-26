@@ -1,0 +1,195 @@
+@import 'tailwindcss';
+
+/*
+ * 디자인 시안의 색/타이포를 토큰으로 옮겨 둔 곳.
+ * 컴포넌트는 이 토큰만 참조하고, 값 자체는 여기서만 바꾼다.
+ */
+@theme {
+  --font-sans: var(--font-gowun-dodum), 'Gowun Dodum', system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-cream-50: oklch(0.985 0.012 85);
+  --color-cream-100: oklch(0.975 0.016 84);
+  --color-cream-200: oklch(0.965 0.018 84);
+  --color-sand-100: oklch(0.955 0.02 80);
+  --color-sand-200: oklch(0.945 0.022 80);
+  --color-sand-300: oklch(0.925 0.028 76);
+  --color-sand-400: oklch(0.915 0.03 76);
+
+  --color-line: oklch(0.86 0.028 74);
+  --color-line-soft: oklch(0.9 0.02 78);
+  --color-track: oklch(0.9 0.02 76);
+  --color-surface: oklch(0.92 0.02 78);
+
+  --color-ink: oklch(0.36 0.022 62);
+  --color-ink-strong: oklch(0.4 0.05 58);
+  --color-ink-soft: oklch(0.52 0.03 62);
+  --color-ink-mid: oklch(0.5 0.03 62);
+  --color-ink-faint: oklch(0.66 0.03 66);
+  --color-ink-mono: oklch(0.44 0.05 58);
+  --color-ink-stat: oklch(0.42 0.05 58);
+  --color-ink-label: oklch(0.62 0.03 64);
+  --color-ink-quiet: oklch(0.6 0.03 64);
+
+  --color-accent: oklch(0.68 0.11 48);
+  --color-accent-strong: oklch(0.62 0.11 48);
+  --color-accent-ink: oklch(0.99 0.01 85);
+  --color-paw: oklch(0.42 0.06 48);
+
+  --color-coat: oklch(0.85 0.075 68);
+  --color-coat-dark: oklch(0.74 0.095 58);
+  --color-coat-light: oklch(0.965 0.018 84);
+  --color-ear-inner: oklch(0.82 0.05 40);
+  --color-eye: oklch(0.28 0.02 60);
+  --color-nose: oklch(0.3 0.025 40);
+  --color-blush: oklch(0.78 0.09 28);
+  --color-heart-1: oklch(0.72 0.12 25);
+  --color-heart-2: oklch(0.78 0.1 30);
+  --color-heart-3: oklch(0.75 0.11 28);
+  --color-shadow: oklch(0.72 0.04 70);
+  --color-bar-quiet: oklch(0.86 0.05 62);
+  --color-highlight: oklch(0.99 0.005 90);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-sand-100);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: oklch(0.55 0.09 55);
+  text-decoration: none;
+}
+
+a:hover {
+  color: oklch(0.44 0.1 45);
+}
+
+/* 강아지 위에서는 기본 커서를 감추고 발바닥 커서를 쓴다(정밀 포인터 한정). */
+.pupat-dog {
+  cursor: grab;
+}
+
+@media (pointer: fine) {
+  .pupat-dog {
+    cursor: none;
+  }
+}
+
+/* 강아지가 서 있는 무대 배경. 모바일은 조금 더 좁고 진한 그라데이션. */
+.pupat-stage {
+  background: radial-gradient(
+    120% 80% at 50% 22%,
+    var(--color-cream-50) 0%,
+    var(--color-sand-200) 68%,
+    var(--color-sand-400) 100%
+  );
+}
+
+@media (min-width: 640px) {
+  .pupat-stage {
+    background: radial-gradient(
+      120% 90% at 50% 18%,
+      var(--color-cream-50) 0%,
+      var(--color-sand-100) 62%,
+      var(--color-sand-300) 100%
+    );
+  }
+}
+
+.pupat-panel {
+  background: linear-gradient(180deg, oklch(0.98 0.014 84) 0%, oklch(0.94 0.024 78) 100%);
+}
+
+@keyframes sd-float {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-90px) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes sd-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes sd-zzz {
+  0% {
+    transform: translate(0, 0) scale(0.7);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(26px, -54px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+@keyframes sd-rise {
+  0% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.sd-float {
+  animation: sd-float 2.4s ease-out infinite;
+}
+
+.sd-ripple {
+  animation: sd-ripple 0.75s ease-out forwards;
+}
+
+.sd-zzz {
+  animation: sd-zzz 3.4s ease-out infinite;
+}
+
+.sd-rise {
+  animation: sd-rise 0.5s ease-out;
+}
+
+/* 접근성: 모션을 줄여 달라고 하면 반복 애니메이션을 멈춘다.
+   (고개 추적처럼 입력에 대한 직접적인 반응은 엔진 쪽에서 진폭만 줄인다.) */
+@media (prefers-reduced-motion: reduce) {
+  .sd-float,
+  .sd-ripple,
+  .sd-zzz,
+  .sd-rise {
+    animation: none;
+  }
+
+  .sd-ripple {
+    opacity: 0;
+  }
+}
