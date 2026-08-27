@@ -6,12 +6,19 @@ import type { DogVisual } from './types';
  * (디자인 시안과 동일한 계수: k = 1 - 0.001^dt)
  */
 
-export interface GazeTarget {
+/** 매 프레임 따라가야 할 목표값 */
+export interface VisualTargets {
   headX: number;
   headY: number;
   headRotation: number;
   eyeX: number;
   eyeY: number;
+  /** 귀 각도(deg) — 귀를 만지는 중이면 크게 젖힌다 */
+  ear: number;
+  /** 앞발 들기 0..1 — 배를 만져 줄 때 벌러덩 */
+  pawLift: number;
+  /** 몸 기울임 -1..1 */
+  lean: number;
 }
 
 export function createVisual(): DogVisual {
@@ -24,12 +31,15 @@ export function createVisual(): DogVisual {
     breathe: 0,
     tailAngle: 0,
     earAngle: 0,
+    hop: 0,
+    pawLift: 0,
+    lean: 0,
     blinking: false,
   };
 }
 
-export function createGazeTarget(): GazeTarget {
-  return { headX: 0, headY: 0, headRotation: 0, eyeX: 0, eyeY: 0 };
+export function createTargets(): VisualTargets {
+  return { headX: 0, headY: 0, headRotation: 0, eyeX: 0, eyeY: 0, ear: 0, pawLift: 0, lean: 0 };
 }
 
 export function damping(dt: number): number {
@@ -39,7 +49,7 @@ export function damping(dt: number): number {
 /**
  * 한 프레임 전진.
  * @param visual 보간 대상(직접 변경)
- * @param target 시선 목표
+ * @param target 따라갈 목표값
  * @param profile 현재 행동의 애니메이션 규칙
  * @param dt 초 단위 델타
  * @param elapsed 애니메이션 위상 계산용 누적 시간(ms)
@@ -47,7 +57,7 @@ export function damping(dt: number): number {
  */
 export function advanceVisual(
   visual: DogVisual,
-  target: GazeTarget,
+  target: VisualTargets,
   profile: BehaviorProfile,
   dt: number,
   elapsed: number,
@@ -60,10 +70,14 @@ export function advanceVisual(
   visual.headRotation += (target.headRotation - visual.headRotation) * k;
   visual.eyeX += (target.eyeX - visual.eyeX) * k;
   visual.eyeY += (target.eyeY - visual.eyeY) * k;
+  visual.lean += (target.lean - visual.lean) * k * 0.8;
 
   const phase = (period: number) => (elapsed / period) * Math.PI * 2;
 
   visual.breathe = Math.sin(phase(profile.breathePeriodMs)) * profile.breatheAmplitude * motionScale;
   visual.tailAngle = Math.sin(phase(profile.tailPeriodMs)) * profile.tailAmplitude * motionScale;
-  visual.earAngle += (profile.earTarget - visual.earAngle) * k * 0.5;
+  visual.earAngle += (target.ear - visual.earAngle) * k * 0.5;
+  visual.pawLift += (target.pawLift - visual.pawLift) * k * 0.6;
+  // 튀어오름은 행동(act)이 더해 주고, 남은 잔여만 0으로 되돌린다.
+  visual.hop += (0 - visual.hop) * k;
 }

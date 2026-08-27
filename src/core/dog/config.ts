@@ -14,14 +14,24 @@ export interface DogEngineConfig {
   petReleaseMs: number;
   /** PETTING이 HAPPY로 승격되기까지(s) */
   happyAfterSec: number;
-  /** 애정도 감쇠 속도(초당) */
+  /** HAPPY가 BLISS로 녹아내리기까지(s) */
+  blissAfterSec: number;
+  /** BLISS로 가기 위한 최소 애정도(0..1)와 손길 만족도 */
+  blissAffection: number;
+  blissQuality: number;
+  /** 애정도 감쇠 속도(초당, 0..1 기준) */
   affectionDecayPerSec: number;
-  /** 이동 거리 대비 애정도 상승량 (affection += distance / affectionDivisor) */
-  affectionDivisor: number;
+  /** 만족도 1의 손길을 1초 유지했을 때 오르는 애정도(0..1 기준) */
+  affectionGainPerSec: number;
   /** 쓰다듬기로 인정할 최소 이동 거리(px) */
   petMoveThreshold: number;
   /** 리플 하나를 만들 이동 거리(px) */
   rippleDistance: number;
+  /** 속도 구간 경계(SVG 단위/초) */
+  speedSlowMax: number;
+  speedFastMin: number;
+  /** 이보다 빠르면 어떤 강아지도 좋아하지 않는다 */
+  speedPanicMin: number;
   /** 눈 깜빡임 주기(ms) / 지속(ms) */
   blinkIntervalMs: number;
   blinkDurationMs: number;
@@ -36,20 +46,29 @@ export interface DogEngineConfig {
   eyeOffsetXGain: number;
   eyeOffsetYMax: number;
   eyeOffsetYGain: number;
+  /** idle/랜덤 행동 사용 여부와 돌발 행동이 뽑힐 확률 */
+  actsEnabled: boolean;
+  randomActChance: number;
   /** 모션 감소 모드 */
   reducedMotion: boolean;
 }
 
 export const DEFAULT_DOG_CONFIG: DogEngineConfig = {
-  sleepAfterMs: 9000,
+  sleepAfterMs: 12000,
   lookingIdleMs: 2600,
-  petReleaseMs: 600,
-  happyAfterSec: 1.5,
-  affectionDecayPerSec: 0.5,
-  affectionDivisor: 700,
+  petReleaseMs: 620,
+  happyAfterSec: 1.2,
+  blissAfterSec: 3.2,
+  blissAffection: 0.7,
+  blissQuality: 0.85,
+  affectionDecayPerSec: 0.02,
+  affectionGainPerSec: 0.07,
   petMoveThreshold: 1,
   rippleDistance: 40,
-  blinkIntervalMs: 3800,
+  speedSlowMax: 340,
+  speedFastMin: 1250,
+  speedPanicMin: 2600,
+  blinkIntervalMs: 3600,
   blinkDurationMs: 130,
   headRotationMax: 11,
   headRotationGain: 13,
@@ -61,6 +80,8 @@ export const DEFAULT_DOG_CONFIG: DogEngineConfig = {
   eyeOffsetXGain: 12,
   eyeOffsetYMax: 6,
   eyeOffsetYGain: 9,
+  actsEnabled: true,
+  randomActChance: 0.35,
   reducedMotion: false,
 };
 
@@ -75,15 +96,16 @@ export type InputProfileId = 'fine' | 'coarse';
 export const INPUT_PROFILES: Record<InputProfileId, Partial<DogEngineConfig>> = {
   // 마우스/트랙패드 등 정밀 포인터
   fine: {
-    affectionDivisor: 700,
     rippleDistance: 40,
     petMoveThreshold: 1,
   },
-  // 손가락 등 거친 포인터
+  // 손가락 등 거친 포인터 — 손이 크게 움직이므로 속도 기준도 넉넉하게 잡는다
   coarse: {
-    affectionDivisor: 500,
     rippleDistance: 32,
     petMoveThreshold: 2,
+    speedSlowMax: 420,
+    speedFastMin: 1500,
+    speedPanicMin: 3000,
   },
 };
 

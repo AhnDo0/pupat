@@ -14,7 +14,7 @@ export interface StorageAdapter {
   remove(key: string): void;
 }
 
-export type SoundCue = 'happy' | 'pet';
+export type SoundCue = 'happy' | 'bliss' | 'pet' | 'bark';
 
 export interface SoundAdapter {
   play(cue: SoundCue): void;

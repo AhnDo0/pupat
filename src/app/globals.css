@@ -47,6 +47,18 @@
   --color-heart-2: oklch(0.78 0.1 30);
   --color-heart-3: oklch(0.75 0.11 28);
   --color-shadow: oklch(0.72 0.04 70);
+  --color-zone: oklch(0.8 0.1 52);
+  --color-tongue: oklch(0.72 0.13 22);
+  --color-tongue-crease: oklch(0.63 0.14 22);
+  --color-wing: oklch(0.82 0.09 96);
+  --color-wing-light: oklch(0.86 0.07 96);
+  --color-wing-body: oklch(0.45 0.04 70);
+  --color-bubble: oklch(1 0 0 / 0.92);
+  --color-chip: oklch(0.32 0.03 60 / 0.82);
+  --color-chip-ink: oklch(0.98 0.01 88);
+  --color-good: oklch(0.5 0.11 140);
+  --color-bad: oklch(0.58 0.15 28);
+  --color-ripple-bad: oklch(0.62 0.16 28);
   --color-bar-quiet: oklch(0.86 0.05 62);
   --color-highlight: oklch(0.99 0.005 90);
 }
@@ -152,6 +164,21 @@ a:hover {
   }
 }
 
+@keyframes sd-pop {
+  0% {
+    transform: scale(0.6) translateY(6px);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.06) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
 @keyframes sd-rise {
   0% {
     transform: translateY(14px);
@@ -179,13 +206,18 @@ a:hover {
   animation: sd-rise 0.5s ease-out;
 }
 
+.sd-pop {
+  animation: sd-pop 0.3s ease-out;
+}
+
 /* 접근성: 모션을 줄여 달라고 하면 반복 애니메이션을 멈춘다.
    (고개 추적처럼 입력에 대한 직접적인 반응은 엔진 쪽에서 진폭만 줄인다.) */
 @media (prefers-reduced-motion: reduce) {
   .sd-float,
   .sd-ripple,
   .sd-zzz,
-  .sd-rise {
+  .sd-rise,
+  .sd-pop {
     animation: none;
   }
 

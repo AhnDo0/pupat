@@ -6,7 +6,9 @@ import type { SoundAdapter, SoundCue } from '../types';
  */
 const CUES: Record<SoundCue, { from: number; to: number; gain: number; length: number }> = {
   happy: { from: 520, to: 880, gain: 0.06, length: 0.42 },
+  bliss: { from: 660, to: 990, gain: 0.06, length: 0.5 },
   pet: { from: 320, to: 380, gain: 0.02, length: 0.14 },
+  bark: { from: 720, to: 320, gain: 0.05, length: 0.24 },
 };
 
 export function createWebSound(): SoundAdapter {

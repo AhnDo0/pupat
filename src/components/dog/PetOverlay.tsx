@@ -6,6 +6,8 @@ export interface Ripple {
   id: number;
   x: number;
   y: number;
+  /** 좋아하는 손길이었는지 — 물결 색이 달라진다 */
+  good: boolean;
 }
 
 export interface PetOverlayHandle {
@@ -19,30 +21,30 @@ interface PetOverlayProps {
   /** 정밀 포인터(마우스)일 때만 발바닥 커서를 그린다. */
   showPaw: boolean;
   ripples: Ripple[];
+  /** 커서 위에 띄우는 부위 이름(없으면 숨김) */
+  zoneLabel: string | null;
 }
 
 /**
- * 쓰다듬기 시각 효과 레이어 — 발바닥 커서, 손끝 글로우, 물결.
+ * 쓰다듬기 시각 효과 레이어 — 발바닥 커서, 손끝 글로우, 물결, 부위 이름.
  * 입력을 가로채지 않도록 pointer-events: none.
  */
 export const PetOverlay = forwardRef<PetOverlayHandle, PetOverlayProps>(function PetOverlay(
-  { opacity, showPaw, ripples },
+  { opacity, showPaw, ripples, zoneLabel },
   ref,
 ) {
   const glow = useRef<HTMLDivElement>(null);
   const paw = useRef<SVGSVGElement>(null);
+  const chip = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
     setPoint(x, y) {
-      const position = `${x}px`;
+      const left = `${x}px`;
       const top = `${y}px`;
-      if (glow.current) {
-        glow.current.style.left = position;
-        glow.current.style.top = top;
-      }
-      if (paw.current) {
-        paw.current.style.left = position;
-        paw.current.style.top = top;
+      for (const node of [glow.current, paw.current, chip.current]) {
+        if (!node) continue;
+        node.style.left = left;
+        node.style.top = top;
       }
     },
   }));
@@ -56,7 +58,7 @@ export const PetOverlay = forwardRef<PetOverlayHandle, PetOverlayProps>(function
           style={{
             left: `${ripple.x}px`,
             top: `${ripple.y}px`,
-            borderColor: 'var(--color-accent)',
+            borderColor: ripple.good ? 'var(--color-accent)' : 'var(--color-ripple-bad)',
           }}
         />
       ))}
@@ -86,6 +88,15 @@ export const PetOverlay = forwardRef<PetOverlayHandle, PetOverlayProps>(function
           <circle cx="29" cy="14.5" r="3.6" fill="var(--color-paw)" />
         </svg>
       ) : null}
+
+      <div
+        ref={chip}
+        aria-hidden="true"
+        className="absolute -translate-x-1/2 -translate-y-[160%] whitespace-nowrap rounded-full bg-chip px-[11px] py-[5px] text-[11.5px] text-chip-ink transition-opacity duration-200"
+        style={{ opacity: zoneLabel ? 1 : 0 }}
+      >
+        {zoneLabel ?? ''}
+      </div>
     </div>
   );
 });

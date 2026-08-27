@@ -1,4 +1,6 @@
-import type { DogAction, EyeVariant } from './types';
+import { object } from './korean';
+import { zoneName } from './petZones';
+import type { DogAction, EyeVariant, PetZoneId } from './types';
 
 /**
  * 행동(behavior) = "이 상태일 때 몸이 어떻게 움직여야 하는가"에 대한 규칙표.
@@ -15,6 +17,8 @@ export interface BehaviorProfile {
   tailAmplitude: number;
   /** 귀 목표 각도(deg) */
   earTarget: number;
+  /** 몸을 기대는 정도 -1..1 */
+  lean: number;
   /** 눈 표현 */
   eyes: EyeVariant;
   /** 깜빡임 허용 여부 */
@@ -23,8 +27,10 @@ export interface BehaviorProfile {
   blush: boolean;
   hearts: boolean;
   sleeping: boolean;
+  /** 혀를 내밀고 있는지 */
+  tongue: boolean;
   /** 입 모양 */
-  mouth: 'smile' | 'grin' | 'rest';
+  mouth: 'smile' | 'grin' | 'melt' | 'rest' | 'pout';
 }
 
 const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
@@ -34,11 +40,13 @@ const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
     tailPeriodMs: 1400,
     tailAmplitude: 6,
     earTarget: 0,
+    lean: 0,
     eyes: 'open',
     allowBlink: true,
     blush: false,
     hearts: false,
     sleeping: false,
+    tongue: false,
     mouth: 'smile',
   },
   looking: {
@@ -47,11 +55,13 @@ const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
     tailPeriodMs: 1400,
     tailAmplitude: 6,
     earTarget: 0,
+    lean: 0,
     eyes: 'open',
     allowBlink: true,
     blush: false,
     hearts: false,
     sleeping: false,
+    tongue: false,
     mouth: 'smile',
   },
   petting: {
@@ -60,11 +70,13 @@ const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
     tailPeriodMs: 320,
     tailAmplitude: 15,
     earTarget: 16,
+    lean: 0,
     eyes: 'closed',
     allowBlink: false,
     blush: false,
     hearts: false,
     sleeping: false,
+    tongue: false,
     mouth: 'grin',
   },
   happy: {
@@ -73,12 +85,44 @@ const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
     tailPeriodMs: 180,
     tailAmplitude: 28,
     earTarget: 16,
+    lean: 0.5,
     eyes: 'closed',
     allowBlink: false,
     blush: true,
     hearts: true,
     sleeping: false,
+    tongue: false,
     mouth: 'grin',
+  },
+  bliss: {
+    breathePeriodMs: 1100,
+    breatheAmplitude: 0.022,
+    tailPeriodMs: 130,
+    tailAmplitude: 34,
+    earTarget: 16,
+    lean: 0.5,
+    eyes: 'closed',
+    allowBlink: false,
+    blush: true,
+    hearts: true,
+    sleeping: false,
+    tongue: true,
+    mouth: 'melt',
+  },
+  annoyed: {
+    breathePeriodMs: 1800,
+    breatheAmplitude: 0.022,
+    tailPeriodMs: 1600,
+    tailAmplitude: 3,
+    earTarget: -8,
+    lean: -1,
+    eyes: 'flat',
+    allowBlink: false,
+    blush: false,
+    hearts: false,
+    sleeping: false,
+    tongue: false,
+    mouth: 'pout',
   },
   sleepy: {
     breathePeriodMs: 2600,
@@ -86,11 +130,13 @@ const BEHAVIORS: Record<DogAction, BehaviorProfile> = {
     tailPeriodMs: 2200,
     tailAmplitude: 3,
     earTarget: 22,
+    lean: 0,
     eyes: 'flat',
     allowBlink: false,
     blush: false,
     hearts: false,
     sleeping: true,
+    tongue: false,
     mouth: 'rest',
   },
 };
@@ -106,6 +152,8 @@ export function shouldResetGaze(action: DogAction): boolean {
 
 const MOUTH_PATHS = {
   grin: 'M272 316 Q 300 344 328 316',
+  melt: 'M266 314 Q 300 350 334 314',
+  pout: 'M276 320 Q 300 306 324 320',
   rest: 'M286 312 Q 300 322 314 312',
   smile: 'M276 310 Q 288 324 300 310 Q 312 324 324 310',
 } as const;
@@ -114,19 +162,32 @@ export function mouthPathFor(profile: BehaviorProfile): string {
   return MOUTH_PATHS[profile.mouth];
 }
 
-/** 상태별 안내 문구. 입력 방식에 따라 "마우스/손가락"만 달라진다. */
-export function hintFor(action: DogAction, pointer: 'fine' | 'coarse'): string {
+/**
+ * 상태별 안내 문구.
+ * Phase 2에서는 지금 만지고 있는 부위까지 문구에 반영한다.
+ */
+export function hintFor(
+  action: DogAction,
+  zone: PetZoneId,
+  pointer: 'fine' | 'coarse',
+): string {
+  const name = zoneName(zone);
   const verb = pointer === 'coarse' ? '손가락으로' : '마우스로';
+
   switch (action) {
-    case 'looking':
-      return `${verb} 쓰다듬어 주세요`;
+    case 'annoyed':
+      return '지금은 그 손길이 불편해요';
+    case 'bliss':
+      return '완전히 녹아버렸어요';
+    case 'happy':
+      return name ? `${name} 쓰담이 딱 좋아요` : '기분이 아주 좋아요';
     case 'petting':
       return '계속 쓰다듬어 주세요';
-    case 'happy':
-      return '기분이 아주 좋아요';
     case 'sleepy':
       return '살짝 졸고 있어요';
+    case 'looking':
+      return name ? `${object(name)} 쓰다듬어 볼까요` : `${verb} 쓰다듬어 주세요`;
     default:
-      return '강아지를 눌러서 쓰다듬어 보세요';
+      return '부위별로 쓰다듬어 보세요 — 반응이 모두 달라요';
   }
 }
