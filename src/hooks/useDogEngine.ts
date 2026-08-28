@@ -16,6 +16,13 @@ export interface DogStageHandlers {
   onPointerLeave: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
+/** 무대 위에 얹힌 UI — 여기서 시작한 입력은 쓰다듬기가 아니다. */
+const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, label, [role="button"]';
+
+function isInteractive(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null;
+}
+
 export interface UseDogEngineOptions {
   /** 매 프레임 호출. 여기서 DOM에 직접 값을 꽂아 리렌더 없이 애니메이션한다. */
   onFrame?: (pose: DogPose, engine: DogEngine) => void;
@@ -98,6 +105,11 @@ export function useDogEngine(options: UseDogEngineOptions = {}): UseDogEngineRes
   const handlers = useMemo<DogStageHandlers>(
     () => ({
       onPointerDown: (event) => {
+        // 헤더·푸터의 버튼과 링크에서 시작한 입력은 건드리지 않는다.
+        // 여기서 포인터를 캡처해 버리면 이어지는 click이 캡처한 무대로 가서
+        // 기록 링크나 사운드 토글이 눌리지 않는다.
+        if (isInteractive(event.target)) return;
+
         const sample = sampleFrom(event);
         if (!sample) return;
         // 손가락이 강아지 밖으로 나가도 쓰다듬기가 끊기지 않도록 캡처한다.
