@@ -24,6 +24,7 @@ import {
   speedFactorOf,
 } from './dogInteraction';
 import { poseFrom } from './dogRender';
+import { SquishField, type SquishFrame } from './dogSquish';
 import {
   canTransition,
   clamp,
@@ -34,7 +35,7 @@ import {
   markZone,
 } from './dogState';
 import { topic } from './korean';
-import { zoneName, type PetZone } from './petZones';
+import { hitTestZone, zoneName, type PetZone } from './petZones';
 import type {
   DogAction,
   DogEvent,
@@ -102,6 +103,11 @@ const EMOTE_BLISS = { icon: '♪', color: 'oklch(0.56 0.12 300)', ms: 2000 };
 const EMOTE_ANNOYED = { icon: '!', color: 'oklch(0.58 0.16 28)', ms: 1500 };
 const EMOTE_CURIOUS = { icon: '?', color: 'oklch(0.6 0.06 70)', ms: 1000 };
 
+/** 이보다 얕게 눌렀다 떼면 반응하지 않는다 */
+const SQUISH_REACT_DEPTH = 0.25;
+/** 연속으로 주무를 때 같은 반응이 쏟아지지 않게 하는 쿨다운(ms) */
+const SQUISH_REACT_COOLDOWN_MS = 900;
+
 /**
  * 강아지 인터랙션 엔진.
  *
@@ -118,6 +124,11 @@ export class DogEngine {
   private visual: DogVisual = createVisual();
   private target: VisualTargets = createTargets();
   private tracker: PetTracker;
+  /** 볼 스쿼시. 포인터 ID로 양쪽을 따로 잡는다. */
+  private squish = new SquishField();
+  /** 쓰다듬기 판정을 맡는 포인터. 두 번째 손가락은 볼만 만진다. */
+  private primaryPointer: number | null = null;
+  private lastSquishReactAt = 0;
 
   private listeners = new Set<DogEventListener>();
   private subscribers = new Set<() => void>();
@@ -163,6 +174,7 @@ export class DogEngine {
     this.configOverrides = { ...this.configOverrides, ...overrides };
     this.config = resolveConfig(this.configOverrides, this.profile);
     this.tracker.setConfig(this.config, this.profile === 'coarse');
+    this.squish.setReducedMotion(this.config.reducedMotion);
   }
 
   setReducedMotion(reduced: boolean): void {
@@ -194,6 +206,8 @@ export class DogEngine {
     if (this.breedId === id) return;
     this.breedId = id;
     this.tracker.setBreed(this.breed());
+    this.squish.release();
+    this.squish.setHover(null);
     this.act = null;
     this.state.activeZone = 'none';
     this.state.hoverZone = 'none';
@@ -241,7 +255,7 @@ export class DogEngine {
   }
 
   private buildSnapshot(): DogSnapshot {
-    const pressing = this.tracker.isPressing;
+    const pressing = this.tracker.isPressing || this.squish.pressing;
     const speedFactor = speedFactorOf(this.breed(), this.state.speed, this.config);
     const grainFactor = grainFactorOf(this.state.grain);
 
@@ -358,15 +372,36 @@ export class DogEngine {
   pointerDown(sample: PointerSample): void {
     this.lastInputAt = sample.time;
     this.cursorOn = true;
-    const started = this.tracker.down(sample);
-    this.syncZones();
-    if (!started && this.state.currentAction === 'sleepy') this.transition('looking');
+
+    // 볼은 쓰다듬기와 별개로 먼저 잡는다. 두 번째 손가락도 여기까지는 들어온다.
+    const zone = hitTestZone(sample.local, this.breed(), this.profile === 'coarse');
+    if (zone?.id === 'cheek' && zone.side) {
+      this.squish.grab(zone.side, sample.id, sample.local);
+      this.act = null;
+      if (this.state.currentAction === 'sleepy') this.transition('looking');
+    }
+
+    // 쓰다듬기 판정은 첫 번째 포인터만 맡는다(속도·방향이 뒤섞이지 않도록).
+    if (this.primaryPointer === null) {
+      this.primaryPointer = sample.id;
+      const started = this.tracker.down(sample);
+      this.syncZones();
+      if (!started && this.state.currentAction === 'sleepy') this.transition('looking');
+    }
     this.publish();
   }
 
   pointerMove(sample: PointerSample): void {
     this.lastInputAt = sample.time;
     this.cursorOn = true;
+    this.squish.drag(sample.id, sample.local);
+
+    // 두 번째 손가락은 볼만 만진다.
+    if (this.primaryPointer !== null && this.primaryPointer !== sample.id) {
+      this.publish();
+      return;
+    }
+
     this.aimGaze(sample);
 
     const gesture = this.tracker.move(sample);
@@ -391,14 +426,27 @@ export class DogEngine {
     this.publish();
   }
 
-  pointerUp(): void {
-    this.tracker.release();
-    this.endStroke();
-    this.transition('looking');
+  /** @param pointerId 없으면(취소 등) 모든 포인터를 놓는다. */
+  pointerUp(pointerId?: number): void {
+    const released = this.squish.release(pointerId);
+
+    const isPrimary = this.primaryPointer === null || this.primaryPointer === pointerId;
+    if (pointerId === undefined || isPrimary) {
+      this.primaryPointer = null;
+      this.tracker.release();
+      this.endStroke();
+      this.transition('looking');
+    }
+
+    // 볼을 놓는 순간의 반응은 상태 전이 뒤에 골라야 눈을 깜빡일 수 있다.
+    for (const cheek of released) this.squishReaction(cheek.depth);
     this.publish();
   }
 
   pointerLeave(): void {
+    this.squish.release();
+    this.squish.setHover(null);
+    this.primaryPointer = null;
     this.tracker.release();
     this.tracker.clearHover();
     this.cursorOn = false;
@@ -420,7 +468,42 @@ export class DogEngine {
   private syncZones(): void {
     const zone = this.tracker.currentZone;
     this.state.hoverZone = zone ? zone.id : 'none';
+    // 커서가 볼 위에 있으면 아주 미세하게만 부풀린다.
+    this.squish.setHover(zone?.id === 'cheek' ? (zone.side ?? null) : null);
     markZone(this.state, this.state.hoverZone);
+  }
+
+  /**
+   * 볼에서 손을 뗐을 때의 반응 (Phase 3).
+   * 매번 같은 반응이 나오지 않도록 확률로 고르고, 연속 입력에서는 쿨다운을 둔다.
+   */
+  private squishReaction(depth: number): void {
+    const now = this.elapsed;
+    if (depth < SQUISH_REACT_DEPTH) return;
+    if (now - this.lastSquishReactAt < SQUISH_REACT_COOLDOWN_MS) return;
+    this.lastSquishReactAt = now;
+
+    if (depth > 0.55) this.log('볼이 말랑말랑해요', 'good');
+
+    // 60% 눈 깜빡임 / 20% 귀 / 10% 고개 갸웃 / 5% 꼬리 / 5% 짧은 짖음
+    const roll = Math.random();
+    if (roll < 0.6) {
+      this.forceBlink(now);
+      return;
+    }
+    const name: ActName =
+      roll < 0.8 ? 'earFlick' : roll < 0.9 ? 'headTilt' : roll < 0.95 ? 'tailWag' : 'bark';
+    if (this.config.reducedMotion && !isCalmAct(name)) {
+      this.forceBlink(now);
+      return;
+    }
+    this.startAct(name, now);
+  }
+
+  private forceBlink(now: number): void {
+    if (!behaviorFor(this.state.currentAction).allowBlink || this.act) return;
+    this.visual.blinking = true;
+    this.blinkUntil = now + this.config.blinkDurationMs * 1.6;
   }
 
   /**
@@ -510,13 +593,24 @@ export class DogEngine {
     }
 
     const name = allowed[Math.floor(Math.random() * allowed.length)];
+    const duration = this.startAct(name, now);
+
+    const [min, max] = p.actEveryMs;
+    this.nextActAt = now + min + Math.random() * (max - min) + duration * 1000;
+  }
+
+  /**
+   * 행동 하나를 시작한다. idle 순번이든 볼을 놓은 반응이든 여기로 모인다.
+   * @returns 행동 길이(초)
+   */
+  private startAct(name: ActName, now: number): number {
     this.act = startAct(name);
     const emote = actEmote(name);
     if (emote) this.setEmote(emote.icon, emote.durationMs, emote.color);
     this.emit({ type: 'act', name });
-
-    const [min, max] = p.actEveryMs;
-    this.nextActAt = now + min + Math.random() * (max - min) + this.act.duration * 1000;
+    // 다음 idle 행동이 곧바로 겹치지 않게 미뤄 둔다.
+    this.nextActAt = Math.max(this.nextActAt, now + this.act.duration * 1000 + 1200);
+    return this.act.duration;
   }
 
   // ------------------------------------------------------------------ 프레임
@@ -539,6 +633,7 @@ export class DogEngine {
     }
 
     this.act = advanceAct(this.act, dt);
+    this.squish.step(dt, this.breed().shape);
     if (this.emote && now > this.emote.until) this.emote = null;
 
     this.stepState(now, dt);
@@ -631,17 +726,26 @@ export class DogEngine {
   }
 
   getPose(): DogPose {
+    const shape = this.breed().shape;
     return poseFrom(this.visual, {
       action: this.state.currentAction,
       act: this.act,
       emote: this.emote,
       zone: this.tracker.currentZone,
       zoneVisible: this.cursorOn,
-      pressing: this.tracker.isPressing,
+      pressing: this.tracker.isPressing || this.squish.pressing,
       activeZone: this.state.activeZone,
+      squish: this.getSquish(),
+      headRx: shape.headRx,
+      headRy: shape.headRy,
       elapsed: this.elapsed,
       motionScale: this.config.reducedMotion ? 0.25 : 1,
     });
+  }
+
+  /** 이번 프레임의 볼 스쿼시 상태 */
+  getSquish(): SquishFrame {
+    return this.squish.read(this.breed().shape);
   }
 
   /** 진행 바에 쓰는 애정도(0..1) */

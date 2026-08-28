@@ -26,8 +26,20 @@ export type DogAction =
 /** 행동보다 느리게 변하는 감정 레이블. UI 문구/표정 선택에 쓰인다. */
 export type DogMood = 'calm' | 'curious' | 'delighted' | 'blissful' | 'grumpy' | 'drowsy';
 
-/** 쓰다듬기 부위. 품종마다 부위별 호감도가 다르다(Phase 2). */
-export type PetZoneId = 'head' | 'ear' | 'chin' | 'back' | 'belly' | 'tail' | 'paw' | 'none';
+/**
+ * 쓰다듬기 부위. 품종마다 부위별 호감도가 다르다(Phase 2).
+ * `cheek`은 Phase 3에서 더해진 말랑한 볼 — 누르고 당길 수 있다.
+ */
+export type PetZoneId =
+  | 'head'
+  | 'cheek'
+  | 'ear'
+  | 'chin'
+  | 'back'
+  | 'belly'
+  | 'tail'
+  | 'paw'
+  | 'none';
 
 /** 쓰다듬는 속도 구간 */
 export type SpeedBand = 'slow' | 'mid' | 'fast';
@@ -106,6 +118,13 @@ export type EyeVariant = 'open' | 'closed' | 'flat';
  */
 export interface DogPose {
   headTransform: string;
+  /** 머리 윤곽선 — 볼을 누르면 이 경로가 눌리고 부푼다 */
+  headPath: string;
+  /** 얼굴 전체(귀 제외) — 양쪽 볼을 잡고 벌리면 늘어난다 */
+  faceTransform: string;
+  /** 볼 살(흰 털·홍조) 그룹의 변형 */
+  cheekLeftTransform: string;
+  cheekRightTransform: string;
   bodyTransform: string;
   hopTransform: string;
   tailTransform: string;
@@ -142,6 +161,8 @@ export interface DogPose {
 
 /** 포인터 입력 1샘플. DOM 이벤트가 아니라 정규화된 숫자만 넘긴다. */
 export interface PointerSample {
+  /** 포인터 식별자 — 두 손가락으로 양쪽 볼을 동시에 잡을 때 이걸로 구분한다. */
+  id: number;
   /** 스테이지 기준 좌표(px) — 리플/커서 이펙트 위치 */
   stage: Vec2;
   /** 스테이지 정규화 좌표(-1..1) — 시선/고개 방향 */

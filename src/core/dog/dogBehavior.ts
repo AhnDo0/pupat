@@ -182,10 +182,11 @@ export function hintFor(
     case 'happy':
       return name ? `${name} 쓰담이 딱 좋아요` : '기분이 아주 좋아요';
     case 'petting':
-      return '계속 쓰다듬어 주세요';
+      return zone === 'cheek' ? '볼이 말랑말랑해요' : '계속 쓰다듬어 주세요';
     case 'sleepy':
       return '살짝 졸고 있어요';
     case 'looking':
+      if (zone === 'cheek') return '볼을 눌러 보세요 — 말랑말랑합니다';
       return name ? `${object(name)} 쓰다듬어 볼까요` : `${verb} 쓰다듬어 주세요`;
     default:
       return '부위별로 쓰다듬어 보세요 — 반응이 모두 달라요';

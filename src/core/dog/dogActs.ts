@@ -19,7 +19,8 @@ export type ActName =
   | 'bark'
   | 'butterfly'
   | 'sneeze'
-  | 'zoomies';
+  | 'zoomies'
+  | 'tailWag';
 
 /** 행동 길이(초) */
 export const ACT_DURATION_SEC: Record<ActName, number> = {
@@ -35,6 +36,7 @@ export const ACT_DURATION_SEC: Record<ActName, number> = {
   butterfly: 6.5,
   sneeze: 1.1,
   zoomies: 1.7,
+  tailWag: 1.2,
 };
 
 /** 모션을 줄여 달라고 한 사용자에게는 격한 행동을 뺀다. */
@@ -44,6 +46,7 @@ const CALM_ACTS: ReadonlySet<ActName> = new Set<ActName>([
   'headTilt',
   'sniff',
   'yawn',
+  'tailWag',
 ]);
 
 export function isCalmAct(name: ActName): boolean {
@@ -64,6 +67,8 @@ export interface ActOffsets {
   headX: number;
   headY: number;
   ear: number;
+  /** 꼬리 회전 보정(deg) */
+  tail: number;
   hop: number;
   bodyScaleX: number;
   pawLeft: number;
@@ -78,6 +83,7 @@ export const NEUTRAL_ACT_OFFSETS: ActOffsets = {
   headX: 0,
   headY: 0,
   ear: 0,
+  tail: 0,
   hop: 0,
   bodyScaleX: 0,
   pawLeft: 0,
@@ -179,6 +185,10 @@ export function actOffsets(act: ActState | null, scale = 1): ActOffsets {
       o.headY = (p < 0.4 ? -14 * (p / 0.4) : 16 * (1 - (p - 0.4) / 0.6)) * scale;
       o.eyes = 'flat';
       o.mouth = SNEEZE_MOUTH;
+      break;
+    case 'tailWag':
+      o.tail = Math.sin(p * Math.PI * 8) * 22 * scale;
+      o.ear = Math.sin(p * Math.PI * 4) * 6 * scale;
       break;
     case 'zoomies':
       o.hop = -Math.abs(Math.sin(p * Math.PI * 3)) * 26 * scale;

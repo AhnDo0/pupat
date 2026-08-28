@@ -7,6 +7,7 @@ export * from './dogBehavior';
 export * from './dogActs';
 export * from './dogAnimation';
 export * from './dogInteraction';
+export * from './dogSquish';
 export * from './dogRender';
 export * from './dogReadout';
 export * from './petZones';

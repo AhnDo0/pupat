@@ -1,5 +1,6 @@
 import type { BreedProfile } from './breeds';
 import { DOG_VIEWBOX } from './config';
+import { cheekAnchor } from './dogSquish';
 import type { PetZoneId, Vec2 } from './types';
 
 /**
@@ -23,6 +24,7 @@ const TOUCH_PADDING = 14;
 
 export const ZONE_NAMES: Record<Exclude<PetZoneId, 'none'>, string> = {
   head: '정수리',
+  cheek: '볼',
   ear: '귀',
   chin: '턱',
   back: '등',
@@ -37,8 +39,13 @@ export function zoneName(zone: PetZoneId): string | null {
 
 export function zonesFor(breed: BreedProfile): PetZone[] {
   const s = breed.shape;
+  const cheekL = cheekAnchor(s, 'l');
+  const cheekR = cheekAnchor(s, 'r');
   return [
     { id: 'chin', cx: 300, cy: 314, r: 62 },
+    // 볼은 머리보다 먼저 검사해야 머리 판정에 먹히지 않는다.
+    { id: 'cheek', cx: cheekL.cx, cy: cheekL.cy, r: cheekL.r, side: 'l' },
+    { id: 'cheek', cx: cheekR.cx, cy: cheekR.cy, r: cheekR.r, side: 'r' },
     { id: 'ear', cx: 224, cy: 152, r: 58, side: 'l' },
     { id: 'ear', cx: 376, cy: 152, r: 58, side: 'r' },
     { id: 'head', cx: 300, cy: 240, r: 116 },

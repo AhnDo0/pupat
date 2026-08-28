@@ -119,9 +119,10 @@ export function useDogEngine(options: UseDogEngineOptions = {}): UseDogEngineRes
         } catch {
           /* noop */
         }
-        engine.pointerUp();
+        // 어느 손가락을 뗐는지 알려 줘야 나머지 한 손가락이 계속 볼을 잡고 있을 수 있다.
+        engine.pointerUp(event.pointerId);
       },
-      onPointerCancel: () => engine.pointerUp(),
+      onPointerCancel: (event) => engine.pointerUp(event.pointerId),
       onPointerLeave: () => engine.pointerLeave(),
     }),
     [engine, sampleFrom],

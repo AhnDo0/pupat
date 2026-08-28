@@ -8,6 +8,7 @@ import type { PointerSample, Vec2 } from '@/core/dog';
  * 코어는 숫자만 받는다.
  */
 export interface PointerLike {
+  pointerId: number;
   clientX: number;
   clientY: number;
 }
@@ -44,6 +45,7 @@ export function toPointerSample(
   const stageY = event.clientY - rect.top;
 
   return {
+    id: event.pointerId,
     stage: { x: stageX, y: stageY },
     normal: {
       x: rect.width > 0 ? (stageX / rect.width - 0.5) * 2 : 0,

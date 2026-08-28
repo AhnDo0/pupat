@@ -1,8 +1,14 @@
 'use client';
 
-import { forwardRef, useImperativeHandle, useRef, type RefObject } from 'react';
+import { forwardRef, useId, useImperativeHandle, useRef, type RefObject } from 'react';
 
-import { restingPose, type BreedProfile, type DogPose } from '@/core/dog';
+import {
+  headOutlinePath,
+  NEUTRAL_DEFORM,
+  restingPose,
+  type BreedProfile,
+  type DogPose,
+} from '@/core/dog';
 
 export interface DogSvgHandle {
   /** 매 프레임 호출된다. 리렌더 없이 SVG 속성만 갱신한다. */
@@ -38,6 +44,13 @@ export const DogSvg = forwardRef<DogSvgHandle, DogSvgProps>(function DogSvg(
   const pawLeft = useRef<SVGGElement>(null);
   const pawRight = useRef<SVGGElement>(null);
   const head = useRef<SVGGElement>(null);
+  const headShape = useRef<SVGPathElement>(null);
+  const headClip = useRef<SVGPathElement>(null);
+  const face = useRef<SVGGElement>(null);
+  const cheekLeft = useRef<SVGGElement>(null);
+  const cheekRight = useRef<SVGGElement>(null);
+  const blushLeft = useRef<SVGGElement>(null);
+  const blushRight = useRef<SVGGElement>(null);
   const earLeft = useRef<SVGGElement>(null);
   const earRight = useRef<SVGGElement>(null);
   const eyeShift = useRef<SVGGElement>(null);
@@ -66,6 +79,14 @@ export const DogSvg = forwardRef<DogSvgHandle, DogSvgProps>(function DogSvg(
       pawLeft.current?.setAttribute('transform', pose.pawLeftTransform);
       pawRight.current?.setAttribute('transform', pose.pawRightTransform);
       head.current?.setAttribute('transform', pose.headTransform);
+      // 볼 스쿼시 — 얼굴 윤곽선과 볼 살을 매 프레임 직접 갱신한다.
+      headShape.current?.setAttribute('d', pose.headPath);
+      headClip.current?.setAttribute('d', pose.headPath);
+      face.current?.setAttribute('transform', pose.faceTransform);
+      cheekLeft.current?.setAttribute('transform', pose.cheekLeftTransform);
+      cheekRight.current?.setAttribute('transform', pose.cheekRightTransform);
+      blushLeft.current?.setAttribute('transform', pose.cheekLeftTransform);
+      blushRight.current?.setAttribute('transform', pose.cheekRightTransform);
       earLeft.current?.setAttribute('transform', pose.earLeftTransform);
       earRight.current?.setAttribute('transform', pose.earRightTransform);
       eyeShift.current?.setAttribute('transform', pose.eyeShift);
@@ -102,10 +123,12 @@ export const DogSvg = forwardRef<DogSvgHandle, DogSvgProps>(function DogSvg(
     },
   }));
 
-  // 서버/첫 페인트용 정지 포즈. 이후에는 applyPose가 덮어쓴다.
-  const initial = restingPose();
+  // 한 화면에 강아지가 여러 마리 있어도 클립 경로가 겹치지 않도록.
+  const faceClipId = `pupat-face-${useId().replace(/:/g, '')}`;
   const shape = breed.shape;
   const color = breed.palette;
+  // 서버/첫 페인트용 정지 포즈. 이후에는 applyPose가 덮어쓴다.
+  const initial = restingPose(shape.headRx, shape.headRy);
 
   return (
     <svg
@@ -116,6 +139,15 @@ export const DogSvg = forwardRef<DogSvgHandle, DogSvgProps>(function DogSvg(
       aria-hidden="true"
       focusable="false"
     >
+      <defs>
+        <clipPath id={faceClipId}>
+          <path
+            ref={headClip}
+            d={headOutlinePath(shape.headRx, shape.headRy, NEUTRAL_DEFORM, NEUTRAL_DEFORM)}
+          />
+        </clipPath>
+      </defs>
+
       <ellipse cx="300" cy="546" rx="176" ry="20" fill="var(--color-shadow)" opacity="0.18" />
 
       {/* 커서가 올라간 부위를 은은하게 밝혀 준다 */}
@@ -192,78 +224,116 @@ export const DogSvg = forwardRef<DogSvgHandle, DogSvgProps>(function DogSvg(
             <path d={shape.earRightInnerPath} fill={color.earInner} />
           </g>
 
-          <ellipse cx="300" cy="268" rx={shape.headRx} ry={shape.headRy} fill={color.coat} />
-          <path d={BLAZE_PATH} fill={color.coatLight} opacity={color.blazeOpacity} />
-          <ellipse cx="228" cy="300" rx="42" ry="34" fill={color.coatLight} opacity={color.cheekOpacity} />
-          <ellipse cx="372" cy="300" rx="42" ry="34" fill={color.coatLight} opacity={color.cheekOpacity} />
-          <ellipse cx="300" cy="304" rx={shape.muzzleRx} ry={shape.muzzleRy} fill={color.coatLight} />
-
-          <g ref={blush} opacity={initial.blushOpacity} style={{ transition: 'opacity 0.4s ease' }}>
-            <ellipse cx="196" cy="298" rx="26" ry="15" fill="var(--color-blush)" opacity="0.55" />
-            <ellipse cx="404" cy="298" rx="26" ry="15" fill="var(--color-blush)" opacity="0.55" />
-          </g>
-
-          <g
-            ref={eyesOpen}
-            opacity={initial.eyesOpenOpacity}
-            style={{ transition: 'opacity 0.1s ease' }}
-          >
-            <g
-              ref={eyeShift}
-              transform={initial.eyeShift}
-              style={{ transition: 'transform 0.14s ease' }}
-            >
-              <ellipse ref={eyeLeft} cx="248" cy="256" rx="17" ry={initial.eyeRy} fill="var(--color-eye)" />
-              <ellipse ref={eyeRight} cx="352" cy="256" rx="17" ry={initial.eyeRy} fill="var(--color-eye)" />
-              <circle cx="254" cy="249" r="5.5" fill="var(--color-highlight)" />
-              <circle cx="358" cy="249" r="5.5" fill="var(--color-highlight)" />
-            </g>
-          </g>
-          <g
-            ref={eyesClosed}
-            opacity={initial.eyesClosedOpacity}
-            style={{ transition: 'opacity 0.1s ease' }}
-            fill="none"
-            stroke="var(--color-eye)"
-            strokeWidth="7"
-            strokeLinecap="round"
-          >
-            <path d="M228 260 Q 248 244 268 260" />
-            <path d="M332 260 Q 352 244 372 260" />
-          </g>
-          <g
-            ref={eyesFlat}
-            opacity={initial.eyesFlatOpacity}
-            style={{ transition: 'opacity 0.1s ease' }}
-            fill="none"
-            stroke="var(--color-eye)"
-            strokeWidth="7"
-            strokeLinecap="round"
-          >
-            <path d="M230 258 Q 248 266 266 258" />
-            <path d="M334 258 Q 352 266 370 258" />
-          </g>
-
-          <ellipse cx="300" cy="292" rx="19" ry="14" fill="var(--color-nose)" />
-          <g ref={tongue} opacity={initial.tongueOpacity} style={{ transition: 'opacity 0.2s ease' }}>
-            <path d={TONGUE_PATH} fill="var(--color-tongue)" />
+          {/* 얼굴 — 양쪽 볼을 동시에 잡아 벌리면 이 그룹이 좌우로 늘어난다 */}
+          <g ref={face} transform={initial.faceTransform}>
+            {/* 머리 윤곽선. 타원이 아니라 경로여야 볼이 눌린 자리를 표현할 수 있다. */}
             <path
-              d={TONGUE_CREASE}
+              ref={headShape}
+              d={headOutlinePath(shape.headRx, shape.headRy, NEUTRAL_DEFORM, NEUTRAL_DEFORM)}
+              fill={color.coat}
+            />
+            <path d={BLAZE_PATH} fill={color.coatLight} opacity={color.blazeOpacity} />
+            {/* 볼 살은 얼굴 밖으로 밀려 나가면 안 된다 — 윤곽선으로 잘라 낸다 */}
+            <g clipPath={`url(#${faceClipId})`}>
+              <g ref={cheekLeft} transform={initial.cheekLeftTransform}>
+                <ellipse
+                  cx="228"
+                  cy="300"
+                  rx="42"
+                  ry="34"
+                  fill={color.coatLight}
+                  opacity={color.cheekOpacity}
+                />
+              </g>
+              <g ref={cheekRight} transform={initial.cheekRightTransform}>
+                <ellipse
+                  cx="372"
+                  cy="300"
+                  rx="42"
+                  ry="34"
+                  fill={color.coatLight}
+                  opacity={color.cheekOpacity}
+                />
+              </g>
+            </g>
+            <ellipse cx="300" cy="304" rx={shape.muzzleRx} ry={shape.muzzleRy} fill={color.coatLight} />
+
+            <g
+              ref={blush}
+              opacity={initial.blushOpacity}
+              clipPath={`url(#${faceClipId})`}
+              style={{ transition: 'opacity 0.4s ease' }}
+            >
+              <g ref={blushLeft} transform={initial.cheekLeftTransform}>
+                <ellipse cx="196" cy="298" rx="26" ry="15" fill="var(--color-blush)" opacity="0.55" />
+              </g>
+              <g ref={blushRight} transform={initial.cheekRightTransform}>
+                <ellipse cx="404" cy="298" rx="26" ry="15" fill="var(--color-blush)" opacity="0.55" />
+              </g>
+            </g>
+
+            <g
+              ref={eyesOpen}
+              opacity={initial.eyesOpenOpacity}
+              style={{ transition: 'opacity 0.1s ease' }}
+            >
+              <g
+                ref={eyeShift}
+                transform={initial.eyeShift}
+                style={{ transition: 'transform 0.14s ease' }}
+              >
+                <ellipse ref={eyeLeft} cx="248" cy="256" rx="17" ry={initial.eyeRy} fill="var(--color-eye)" />
+                <ellipse ref={eyeRight} cx="352" cy="256" rx="17" ry={initial.eyeRy} fill="var(--color-eye)" />
+                <circle cx="254" cy="249" r="5.5" fill="var(--color-highlight)" />
+                <circle cx="358" cy="249" r="5.5" fill="var(--color-highlight)" />
+              </g>
+            </g>
+            <g
+              ref={eyesClosed}
+              opacity={initial.eyesClosedOpacity}
+              style={{ transition: 'opacity 0.1s ease' }}
               fill="none"
-              stroke="var(--color-tongue-crease)"
-              strokeWidth="3"
+              stroke="var(--color-eye)"
+              strokeWidth="7"
               strokeLinecap="round"
+            >
+              <path d="M228 260 Q 248 244 268 260" />
+              <path d="M332 260 Q 352 244 372 260" />
+            </g>
+            <g
+              ref={eyesFlat}
+              opacity={initial.eyesFlatOpacity}
+              style={{ transition: 'opacity 0.1s ease' }}
+              fill="none"
+              stroke="var(--color-eye)"
+              strokeWidth="7"
+              strokeLinecap="round"
+            >
+              <path d="M230 258 Q 248 266 266 258" />
+              <path d="M334 258 Q 352 266 370 258" />
+            </g>
+
+            <ellipse cx="300" cy="292" rx="19" ry="14" fill="var(--color-nose)" />
+            <g ref={tongue} opacity={initial.tongueOpacity} style={{ transition: 'opacity 0.2s ease' }}>
+              <path d={TONGUE_PATH} fill="var(--color-tongue)" />
+              <path
+                d={TONGUE_CREASE}
+                fill="none"
+                stroke="var(--color-tongue-crease)"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </g>
+            <path
+              ref={mouth}
+              d={initial.mouthPath}
+              fill="none"
+              stroke="var(--color-nose)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              style={{ transition: 'd 0.18s ease' }}
             />
           </g>
-          <path
-            ref={mouth}
-            d={initial.mouthPath}
-            fill="none"
-            stroke="var(--color-nose)"
-            strokeWidth="6"
-            strokeLinecap="round"
-            style={{ transition: 'd 0.18s ease' }}
-          />
         </g>
       </g>
 
