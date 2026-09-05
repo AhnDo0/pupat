@@ -1,157 +1,142 @@
-# 쓰담하개 (PuPat)
+# 쓰담하개 (PuPat) 🐕
 
+> **웹에서 강아지를 직접 쓰다듬는 인터랙티브 서비스.**
 > 키울 수는 없어도, 쓰다듬을 수는 있으니까.
 
-마우스와 손가락으로 강아지를 직접 쓰다듬는 인터랙티브 웹 서비스.
-**하나의 Next.js + React 코드베이스**로 Desktop Web / Mobile Web / PWA를 지원하고,
-같은 UI와 핵심 로직을 향후 Tauri Desktop App에서 그대로 재사용하는 것을 목표로 한다.
+강아지를 누른 채 움직이면 **부위 · 속도 · 방향**을 실시간으로 판정해, 품종마다 다르게 반응합니다.
+서버도 로그인도 없이 링크만 열면 바로 만질 수 있습니다.
 
-## 시작하기
+**🔗 [pupat.vercel.app](https://pupat.vercel.app/)** — 모바일에서 "홈 화면에 추가"하면 PWA로 설치됩니다
 
-```bash
-npm install
-npm run dev        # http://localhost:3000
-npm run build      # 프로덕션 빌드
-npm run typecheck  # 타입 검사
-npm run icons      # 앱 아이콘 재생성 (public/icons)
+<!-- ![데모](docs/demo.gif)  ← 쓰다듬기 → bliss 전환 GIF 삽입 위치 -->
+
+| | |
+|---|---|
+| **제작 기간** | 2026.08.26 ~ 08.28 (3일) |
+| **참여 인원** | 개인 프로젝트 1인 — 기획 · 인터랙션 설계 · 개발 · 배포 |
+
+---
+
+## ✨ 주요 기능
+- **마우스 트래킹**
+  
+  <img width="393" height="450" alt="GIF_마우스트래킹" src="https://github.com/user-attachments/assets/9d137549-dcf9-48e1-bc9c-d98a07dc841e" />
+
+  마우스를 따라 강아지의 시선과 고개가 움직입니다
+- **쓰다듬기**
+
+  <img width="385" height="451" alt="GIF_쓰다듬기" src="https://github.com/user-attachments/assets/ebbff201-7a21-4618-80e7-19f7e494b070" /> <img width="342" height="450" alt="GIF_배쓰담" src="https://github.com/user-attachments/assets/9657cd1e-3679-47b6-b8ad-443f63adbf56" />
+
+  누름 + 이동 거리 + 속도 + 털의 결 방향을 매 샘플 측정. 손을 떼면 값이 서서히 감쇠해 반응이 툭 끊기지 않습니다.
+
+  만족도: `부위 호감도 × 속도 궁합 × 털 방향`의 곱. 음수면 싫어하고(`annoyed`), 높은 값을 유지하면 `petting → happy → bliss`로 녹아내립니다.
+- **볼 스쿼시**
+
+  <img width="375" height="449" alt="GIF_볼늘리기" src="https://github.com/user-attachments/assets/f964b725-3dfc-4016-9644-38716bde0a3d" />
+
+  키프레임 재생이 아닌 손끝 위치가 곧 변형이 되는 **스프링 물리 모델**적용. 누를 땐 단단하게 따라오고, 떼면 한 번 튕겼다 돌아옵니다.
+- **쓰담 기록** — 오늘/이번 주/연속 방문(`/record`). localStorage에만 저장하고 서버로 보내지 않습니다.
+
+  <img width="219" height="348" alt="쓰담기록" src="https://github.com/user-attachments/assets/d46b76f2-dbe1-49ed-91b7-43674271146d" />
+
+
+---
+
+## 🏗 구조
+
+```mermaid
+flowchart LR
+    IN["마우스 / 터치 / 펜<br/>Pointer Events"] --> P["lib/pointer.ts<br/>유일한 DOM 의존 지점"]
+    P --> E["DogEngine<br/>부위 · 속도 · 방향 → 만족도 → 상태"]
+    E --> POSE["DogPose<br/>숫자 · 문자열"]
+    POSE --> SVG["DogSvg.applyPose()<br/>SVG 속성 직접 갱신"]
+    E -.->|이산 상태 변화만| R["React 리렌더"]
+    E --> PLAT["platform 어댑터<br/>저장소 · 사운드"]
+    PLAT --> WEB["localStorage · Web Audio"]
+    PLAT -.->|교체만 하면| TAURI["Tauri Desktop"]
+
+    style E fill:#f6efe3,stroke:#8a7a63,stroke-width:2px
+    style TAURI stroke-dasharray: 5 5
 ```
-
-## 구조
 
 ```
 src/
-├── core/                     ← 브라우저 API를 쓰지 않는 순수 로직
-│   ├── dog/
-│   │   ├── types.ts          상태·비주얼·입력 타입
-│   │   ├── config.ts         인터랙션 튜닝 값 + 입력 프로파일(fine/coarse)
-│   │   ├── breeds.ts         품종표 — 생김새·색·성격(부위 호감도/선호 속도/행동)
-│   │   ├── dogState.ts       상태 머신 (idle/looking/petting/happy/bliss/annoyed/sleepy)
-│   │   ├── dogBehavior.ts    상태별 몸짓 규칙표(호흡·꼬리·귀·표정·문구)
-│   │   ├── dogActs.ts        idle/랜덤 행동 12종의 연출
-│   │   ├── dogInteraction.ts 쓰다듬기 판정 (누름 + 이동거리 + 속도 + 방향)
-│   │   ├── dogAnimation.ts   프레임 보간
-│   │   ├── dogRender.ts      숫자 → SVG 속성값
-│   │   ├── dogReadout.ts     쓰담 분석 4줄(부위·속도·방향·반응)
-│   │   ├── petZones.ts       부위별 쓰다듬기 영역 (품종 몸 치수에서 계산)
-│   │   ├── korean.ts         조사(은/는, 을/를) 처리
-│   │   └── dogEngine.ts      위를 묶는 엔진 (DOM 의존 0)
-│   └── record/petRecord.ts   쓰담 기록 계산(오늘/이번 주/연속 방문)
-│
-├── platform/                 ← 플랫폼 어댑터 (교체 지점)
-│   ├── types.ts              StorageAdapter / SoundAdapter 인터페이스
-│   ├── web/webStorage.ts     localStorage (실패 시 메모리 폴백)
-│   ├── web/webSound.ts       Web Audio 합성음
-│   └── index.ts              getPlatform() / setPlatform()
-│
-├── hooks/                    ← React ↔ core 연결
-│   ├── useDogEngine.ts       Pointer Events → 엔진, 프레임 → DOM
-│   ├── useBreed.ts           마지막에 고른 강아지 기억
-│   ├── useAnimationFrame.ts
-│   ├── useMediaQuery.ts      포인터 종류 / prefers-reduced-motion
-│   ├── usePetRecord.ts
-│   └── useInstallPrompt.ts
-│
-├── lib/pointer.ts            DOM PointerEvent → 정규화된 샘플
-│
-├── components/
-│   ├── dog/                  DogSvg, PetStage, PetHint, PetOverlay,
-│   │                         BreedPicker, TraitCard, AnalysisCard,
-│   │                         ReactionLog, ReadoutStrip, SidePanel
-│   ├── layout/               AppHeader, AppFooter
-│   ├── record/RecordPanel.tsx
-│   └── pwa/                  InstallPrompt, ServiceWorkerRegistrar
-│
-└── app/                      page(/) · record(/record) · layout · globals.css
+├── core/       브라우저 API를 쓰지 않는 순수 로직 (엔진 · 품종 · 상태 · 기록)
+├── platform/   교체 지점 — StorageAdapter · SoundAdapter
+├── hooks/      React ↔ core 연결
+├── lib/        pointer.ts — 유일한 DOM 의존 지점
+└── app/        / · /record
 ```
 
-### 데이터 흐름
+두 가지 규칙으로 정리했습니다.
+1. **입력 종류는 경계에서 사라진다** — 마우스인지 터치인지는 `lib/pointer.ts`를 지나면 없어지고, 코어는 숫자만 받습니다.
+2. **연속 값은 리렌더하지 않는다** — 고개·꼬리·호흡은 `requestAnimationFrame`에서 SVG에 직접 반영하고, 리렌더는 행동이 바뀔 때만 일어납니다.
 
+---
+
+## 🧰 기술 스택 (선택 이유)
+
+| 기술 | 선정 이유 |
+|---|---|
+| **Next.js 15 · React 19 · TypeScript** | 서버가 필요 없는 프로젝트지만 `output: 'export'`로 **정적 번들을 뽑을 수 있어** 향후 데스크톱용 앱을 위한 Tauri에 그대로 적용 가능. 엔진이 React 밖에 있어 `useSyncExternalStore`로 구독 |
+| **인라인 SVG** (Canvas·이미지 아님) | 귀·눈·꼬리·볼을 **부위 단위로 조작**해야 했습니다. 파츠마다 ref를 잡아 속성만 바꿀 수 있고, 해상도 독립적이며 스크린 리더 텍스트를 넣기 가능 |
+| **Pointer Events** | mouse/touch를 각각 다루면 코드가 두 벌이 됩니다. `setPointerCapture`로 손이 강아지 밖으로 나가도 쓰다듬기가 끊기지 않음 |
+| **Tailwind CSS v4** | 시안의 색을 `oklch` 토큰으로 한 번만 정의해 재사용하기 위함 |
+| **Web Audio API** | 짧은 반응음만 필요하므로 별도 오디오 파일 다운로드 불필요. 합성음이라 **번들 추가 용량 0**. |
+| **localStorage** | 쓰담 기록은 서버에 보낼 이유가 없는 개인 데이터기에 로컬에 저장 |
+| **PWA 직접 구성** (manifest + sw.js 수기) | 플러그인은 빌드 파이프라인에 묶여 정적 내보내기와 충돌할 여지가 있었습니다. 직접 쓰면 캐시 전략을 정확히 알 수 있고, **지워도 앱은 그대로 동작** |
+| **Vercel** | 서버가 없어 정적 배포로 충분, 배포 편의성을 위해 선택 |
+
+
+---
+
+## 🔧 트러블슈팅
+
+### 데스크톱에서만 링크·버튼이 눌리지 않던 문제
+- **문제** — 배포 후 데스크톱에서 기록 링크·품종 변경·사운드 토글이 전혀 작동하지 않음. **모바일은 정상.**
+- **원인** — 쓰다듬기가 끊기지 않도록 무대 전체에 `setPointerCapture`를 걸어 뒀는데, 헤더·푸터의 링크도 같은 무대 안이라 그 위에서 눌러도 캡처가 걸렸습니다. 그 결과 이어지는 `click`이 원래 타깃이 아닌 **캡처한 무대로 전달**됐습니다. 모바일은 터치의 `click`이 터치 대상에서 생성되어 증상이 드러나지 않았습니다.
+- **해결** — `onPointerDown`에서 타깃이 `a, button, input, ...`에 속하면 캡처하지 않고 그대로 통과
+- **배운 점** — 포인터 캡처는 이후 `click`의 전달 경로까지 바꿉니다. "한쪽에서만 재현된다"는 비대칭이 원인을 가장 빨리 좁혀 줬습니다.
+
+### 60fps 인터랙션과 React 리렌더의 충돌
+- **문제** — 고개·꼬리·볼 변형을 상태로 두니 매 프레임 리렌더가 발생해 입력이 무거워짐
+- **해결** — 값을 **연속 값**과 **이산 상태**로 나눠, 연속 값은 `requestAnimationFrame` 안에서 SVG 속성에 직접 반영하고 이산 상태만 `useSyncExternalStore`로 구독했습니다. 리렌더는 행동이 바뀔 때만 일어납니다.
+
+### 마우스와 터치의 판정 기준이 달라야 했던 문제
+- **문제** — 마우스 기준값을 쓰면 터치는 스와이프 이동량이 커서 "빠르게 쓰다듬는다"고 오판했습니다.
+- **해결** — 모바일용 인터랙션을 따로 만드는 대신, 달라야 하는 게 애플리케이션이 아니라 **숫자 몇 개**임을 확인하고 `INPUT_PROFILES`에 `fine` / `coarse` 프로파일을 두어 같은 엔진에 갈아 끼웠습니다.
+
+### 화면 크기가 바뀌면 부위 판정이 어긋난 문제
+- **해결** — `getScreenCTM().inverse()`로 화면 좌표를 SVG 내부 좌표(viewBox 600)로 변환해 **판정·부위·스쿼시가 같은 좌표계를 공유**하도록 했습니다. 지원하지 않는 환경을 위한 수동 스케일 폴백도 두었습니다.
+
+---
+
+## ⚙️ 설치 및 실행
+
+Node.js 20 이상, npm
+
+```bash
+git clone https://github.com/AhnDo0/pupat.git
+cd pupat
+npm install
+
+npm run dev        # http://localhost:3000
+npm run build      # 프로덕션 빌드
+npm run typecheck  # 타입 검사
+npm run icons      # 앱 아이콘 재생성
 ```
-사용자 입력 (마우스 / 터치 / 펜)
-      ↓  Pointer Events
-lib/pointer.ts            ← 유일한 DOM 의존 지점
-      ↓  PointerSample { stage, normal, local }
-DogEngine
-  ├─ PetTracker           쓰다듬기 판정 + 속도/방향 측정
-  ├─ breeds               이 품종이 이 부위·속도·방향을 좋아하는가 → 만족도
-  ├─ dogState             상태 전이
-  ├─ dogBehavior          이 상태에서 몸이 어떻게 움직이는가
-  ├─ dogActs              가만히 있을 때 하는 행동
-  └─ dogAnimation         프레임 보간
-      ↓  DogPose (문자열/숫자)
-DogSvg.applyPose()        ← 리렌더 없이 SVG 속성만 갱신
-```
 
-리렌더는 **이산 상태가 바뀔 때만** 일어난다(행동 변화, 초 단위 타이머).
-고개 각도·꼬리·호흡 같은 연속 값은 `requestAnimationFrame` 안에서 DOM에 직접 반영한다.
+**환경 변수는 필요 없습니다.** 서버·DB·API 키를 쓰지 않아 클론 즉시 실행됩니다.
+빌드 대상을 바꿀 때만 `PUPAT_TARGET=static npm run build`로 정적 내보내기(Tauri용 번들)를 합니다.
+PWA는 프로덕션 빌드에서만 등록되므로 `npm run build && npm run start`로 확인합니다.
 
-## 강아지 반응 (Phase 2)
+---
 
-쓰다듬기의 결과는 **부위 호감도 × 속도 궁합 × 털 방향** 세 값의 곱(만족도)으로 정해진다.
-만족도가 음수면 강아지가 싫어하고(`annoyed`), 높은 만족도를 이어 가면 `happy` → `bliss`로 녹는다.
+## 🪞 회고 및 배운 점
 
-| 품종 | 좋아하는 속도 | 특징 |
-|---|---|---|
-| 리트리버 | 보통 | 어디를 만져도 좋아함, 배 쓰담 최고 |
-| 웰시코기 | 빠름 | 꼬리 민감, 자주 짖음 |
-| 시바견 | 느림 | 배·발 금지, 고개 갸웃 |
+**규칙 하나가 케이스 여러 개보다 낫다.** 반응을 종류별로 만들려다 `부위 × 속도 × 방향`이라는 규칙으로 정리하니, 만들지 않은 조합까지 자연스럽게 반응하고 새 품종은 데이터 한 줄로 늘어나게 됐습니다.
 
-- 부위 7곳: 정수리 · 귀 · 턱 · 등 · 배 · 꼬리 · 발 (`petZones.ts`, 품종 몸 치수에서 계산)
-- 속도: 느긋 / 알맞음 / 빠름 — 품종의 취향과 어긋날수록 만족도가 깎인다
-- 방향: 털 방향 / 가로 / 역방향 — 털을 거스르면 깎인다
-- idle·랜덤 행동 12종: 하품·기지개·귀 털기·긁기·냄새 맡기·고개 갸웃·털기·짖기·나비 쫓기·재채기·주머니 폭주
-- 반응 기록: 강아지가 방금 무엇에 반응했는지 최근 3줄
+**경계를 그으면 플랫폼이 문제가 되지 않는다.** DOM 의존을 한 파일로, 브라우저 기능을 어댑터 뒤로 몰아 둔 덕분에 Web·Mobile·PWA가 분기 없이 같은 코드로 돌아갑니다. "나중에 데스크톱으로 옮길 수 있게"라는 요구가 오히려 **지금의 코드를 단순하게 만드는 제약**으로 작동했습니다.
 
-새 품종은 `breeds.ts`에 항목 하나를 더하는 것으로 끝난다. 엔진과 UI는 손대지 않는다.
-
-## 반응형
-
-별도의 모바일 페이지나 PWA 전용 화면을 만들지 않는다.
-같은 컴포넌트가 breakpoint(`sm` = 640px)에 따라 다르게 보인다.
-
-| | Mobile | Desktop |
-|---|---|---|
-| 상단 | 상태 · 오늘의 쓰담 시간 | 브랜드 + 상태 · 품종 선택 · 사운드 토글 |
-| 강아지 | `max-h: min(44vh, 420px)` | `max-h: min(56vh, 560px)` |
-| 안내 문구 | 15px | 17px |
-| 애정 바 | 140px | 200px |
-| 품종 선택 | 강아지 아래 | 상단 바 |
-| 성격 · 분석 · 기록 | 한 줄 요약(`ReadoutStrip`) | 오른쪽 사이드 패널(`lg` 이상) |
-| 하단 | (상단 타이머로 대체) | 오늘의 쓰담 |
-| 커서 | 손끝 글로우 | 발바닥 커서 + 글로우 + 부위 이름 |
-| 판정 | 영역을 넓혀 큰 터치 타깃 | 촘촘한 판정 |
-
-입력 방식 차이는 **애플리케이션을 나누지 않고** `INPUT_PROFILES`(`core/dog/config.ts`)의
-`fine` / `coarse` 프로파일로 같은 엔진 안에서 처리한다.
-
-## PWA
-
-기존 웹 앱에 얹기만 한다. 지워도 앱은 그대로 동작한다.
-
-- `public/manifest.webmanifest` — standalone, 아이콘, 바로가기
-- `public/sw.js` — 앱 셸 프리캐시, 네비게이션 network-first, 정적 자원 cache-first
-- `components/pwa/ServiceWorkerRegistrar.tsx` — 프로덕션에서만 등록
-- `components/pwa/InstallPrompt.tsx` — `beforeinstallprompt`가 올 때만 뜨는 설치 카드
-- 아이콘: `npm run icons` (`scripts/generate-icons.mjs`가 oklch → sRGB 변환 후 PNG 생성)
-
-모바일 웹과 PWA는 **같은 React 컴포넌트**를 쓴다. 설치 여부로 UI가 갈리지 않는다.
-
-## Desktop App(Tauri) 확장 지점
-
-현재는 Tauri/Rust를 도입하지 않았지만 다음이 이미 준비되어 있다.
-
-1. `src/core/**` 는 DOM·React·Next.js를 import 하지 않는다. 시간은 인자로 받고 입력은 숫자로 받는다.
-2. 저장소와 사운드는 `src/platform` 어댑터 뒤에 있다. Tauri에서는
-   `setPlatform({ kind: 'desktop', storage: tauriStore, createSound })` 한 줄로 교체한다.
-3. `detectPlatformKind()`가 Tauri WebView를 인식한다.
-4. `PUPAT_TARGET=static npm run build` 로 정적 내보내기가 가능하다(Tauri가 로드할 번들).
-
-## 접근성
-
-- `prefers-reduced-motion`: 반복 애니메이션 정지 + 엔진 진폭 축소
-- 사운드 기본 꺼짐, 사용자가 직접 켠다
-- 강아지 상태를 설명하는 스크린 리더용 텍스트 제공
-
-## 기록
-
-기록은 `localStorage`에만 저장된다. 서버·로그인·DB가 없다.
+**개선 목표**
+- [ ] Tauri 데스크톱 앱 — 어댑터 교체로 실제 배포까지
